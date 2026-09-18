@@ -3,12 +3,33 @@
 # self-managed DP client certificate to register (unlike a self-hosted
 # hybrid-mode data plane).
 
+# Looks up the Cloud Gateway provider account(s) already linked to this
+# Konnect org (Konnect UI: Cloud Gateway > Provider Accounts) so the network
+# below doesn't require a hardcoded account ID.
+data "konnect_cloud_gateway_provider_account_list" "my_cloudgatewayprovideraccountlist" {}
+
+locals {
+  # Provider accounts linked to this org, filtered to the target cloud provider.
+  matching_provider_accounts = [
+    for account in data.konnect_cloud_gateway_provider_account_list.my_cloudgatewayprovideraccountlist.data :
+    account if account.provider == var.cloud_gateway_provider
+  ]
+
+  # Use the explicit var override if set, otherwise auto-discover from the
+  # linked provider accounts. Errors loudly if none/ambiguous so plan fails
+  # fast instead of picking the wrong account.
+  cloud_gateway_provider_account_id = coalesce(
+    var.cloud_gateway_provider_account_id,
+    length(local.matching_provider_accounts) == 1 ? local.matching_provider_accounts[0].id : null,
+  )
+}
+
 resource "konnect_cloud_gateway_network" "network" {
   name                              = "konnect-platform-ops-network"
   region                            = var.cloud_gateway_region
   cidr_block                        = var.cloud_gateway_cidr_block
   availability_zones                = var.cloud_gateway_availability_zones
-  cloud_gateway_provider_account_id = var.cloud_gateway_provider_account_id
+  cloud_gateway_provider_account_id = local.cloud_gateway_provider_account_id
 }
 
 resource "konnect_cloud_gateway_configuration" "data_plane" {

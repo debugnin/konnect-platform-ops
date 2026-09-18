@@ -1,6 +1,16 @@
 variable "cloud_gateway_provider_account_id" {
-  description = "Konnect Cloud Gateway provider account ID for the linked cloud account (Konnect UI: Cloud Gateway > Provider Accounts)."
+  description = <<-EOT
+    Konnect Cloud Gateway provider account ID for the linked cloud account
+    (Konnect UI: Cloud Gateway > Provider Accounts).
+
+    Optional: leave unset (null) to auto-discover via the
+    konnect_cloud_gateway_provider_account_list data source, filtered to
+    cloud_gateway_provider. Auto-discovery only works if exactly one
+    provider account is linked for that provider; if you have more than
+    one linked account, set this explicitly to disambiguate.
+  EOT
   type        = string
+  default     = null
 }
 
 variable "cloud_gateway_provider" {

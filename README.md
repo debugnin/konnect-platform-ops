@@ -34,12 +34,24 @@ None of these have defaults — they're specific to your Konnect org and target 
 
 | Variable | Description |
 |---|---|
-| `cloud_gateway_provider_account_id` | Linked provider account ID from the Konnect UI |
 | `cloud_gateway_region` | Cloud provider region, e.g. `ap-southeast-2` |
 | `cloud_gateway_availability_zones` | AZ IDs for that region, from the Konnect UI/API |
 | `cloud_gateway_kong_version` | Kong Gateway version to run on the data plane |
 
 See `variables.tf` for the full variable list, including `cloud_gateway_provider`, `cloud_gateway_cidr_block`, and `control_plane_geo`, which do have defaults you can override.
+
+### Provider account auto-discovery
+
+`cloud_gateway_provider_account_id` is **optional**. If left unset, it's
+auto-discovered via the `konnect_cloud_gateway_provider_account_list` data
+source, filtered to `cloud_gateway_provider` (default `aws`). This works as
+long as your Konnect org has exactly one provider account linked for that
+cloud provider (Konnect UI: Cloud Gateway > Provider Accounts).
+
+If you have more than one linked provider account for the same cloud
+provider, set `cloud_gateway_provider_account_id` explicitly in
+`terraform.tfvars` to disambiguate — otherwise `terraform plan` will fail
+with a null value error.
 
 ## Usage
 

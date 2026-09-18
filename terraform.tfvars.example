@@ -2,7 +2,6 @@
 # terraform.tfvars is auto-loaded by `terraform plan`/`apply` — no -var flags needed.
 
 # Required — no default, specific to your Konnect org and target region.
-cloud_gateway_provider_account_id = "" # from GET /v2/cloud-gateways/provider-accounts
 cloud_gateway_region              = "" # e.g. "ap-southeast-2"
 cloud_gateway_availability_zones  = [] # e.g. ["apse2-az1", "apse2-az2", "apse2-az3"]
 cloud_gateway_kong_version        = "" # e.g. "3.11"
@@ -12,3 +11,9 @@ cloud_gateway_kong_version        = "" # e.g. "3.11"
 # cloud_gateway_cidr_block = "10.0.0.0/16"
 # control_plane_geo = "au"
 # cloud_gateway_base_rps = 10
+
+# Optional — auto-discovered via the konnect_cloud_gateway_provider_account_list
+# data source (filtered to cloud_gateway_provider) if left unset. Only set this
+# explicitly if you have more than one linked provider account for the same
+# cloud provider and need to disambiguate.
+# cloud_gateway_provider_account_id = "" # from GET /v2/cloud-gateways/provider-accounts
