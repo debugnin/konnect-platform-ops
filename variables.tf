@@ -1,13 +1,14 @@
 variable "cloud_gateway_provider_account_id" {
   description = <<-EOT
-    Konnect Cloud Gateway provider account ID for the linked cloud account
-    (Konnect UI: Cloud Gateway > Provider Accounts).
+    Konnect Cloud Gateway provider account ID. Konnect automatically
+    provisions a provider account per org/cloud-vendor pair — no manual
+    linking step is required.
 
     Optional: leave unset (null) to auto-discover via the
     konnect_cloud_gateway_provider_account_list data source, filtered to
     cloud_gateway_provider. Auto-discovery only works if exactly one
-    provider account is linked for that provider; if you have more than
-    one linked account, set this explicitly to disambiguate.
+    provider account exists for that provider (the default/common case);
+    if your org has more than one, set this explicitly to disambiguate.
   EOT
   type        = string
   default     = null

@@ -18,7 +18,10 @@ self-hosted data plane to run and no client certificate to register.
 
 - Terraform >= 1.6
 - A Konnect personal access token with org-admin or CP-admin scope
-- A Konnect Cloud Gateway provider account already linked (Konnect UI: Cloud Gateway > Provider Accounts) for the cloud vendor you deploy into
+
+No manual account-linking step is required: Konnect automatically provisions
+a Cloud Gateway provider account per org/cloud-vendor, and this config looks
+it up for you (see "Provider account auto-discovery" below).
 
 ## Authentication
 
@@ -42,16 +45,18 @@ See `variables.tf` for the full variable list, including `cloud_gateway_provider
 
 ### Provider account auto-discovery
 
-`cloud_gateway_provider_account_id` is **optional**. If left unset, it's
-auto-discovered via the `konnect_cloud_gateway_provider_account_list` data
-source, filtered to `cloud_gateway_provider` (default `aws`). This works as
-long as your Konnect org has exactly one provider account linked for that
-cloud provider (Konnect UI: Cloud Gateway > Provider Accounts).
+`cloud_gateway_provider_account_id` is **optional** and normally doesn't need
+to be set at all. Konnect automatically provisions a Cloud Gateway provider
+account for each org/cloud-vendor pair — there's no manual linking step or
+UI action required. If left unset, the ID is auto-discovered via the
+`konnect_cloud_gateway_provider_account_list` data source, filtered to
+`cloud_gateway_provider` (default `aws`).
 
-If you have more than one linked provider account for the same cloud
-provider, set `cloud_gateway_provider_account_id` explicitly in
-`terraform.tfvars` to disambiguate — otherwise `terraform plan` will fail
-with a null value error.
+This works as long as your Konnect org has exactly one provider account for
+that cloud provider, which is the default/common case. If your org somehow
+has more than one (e.g. multiple AWS provider accounts), set
+`cloud_gateway_provider_account_id` explicitly in `terraform.tfvars` to
+disambiguate — otherwise `terraform plan` will fail with a null value error.
 
 ## Usage
 
