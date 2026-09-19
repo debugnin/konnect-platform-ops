@@ -12,9 +12,8 @@ cloud_gateway_kong_version        = "" # e.g. "3.11"
 # control_plane_geo = "au"
 # cloud_gateway_base_rps = 10
 
-# Optional — auto-discovered via the konnect_cloud_gateway_provider_account_list
-# data source (filtered to cloud_gateway_provider) if left unset; no manual
-# account-linking step is needed. Only set this explicitly if your org has
-# more than one provider account for the same cloud provider and you need
-# to disambiguate.
-# cloud_gateway_provider_account_id = "" # from GET /v2/cloud-gateways/provider-accounts
+# cloud_gateway_provider_account_id is auto-discovered via the
+# konnect_cloud_gateway_provider_account_list data source (filtered to
+# cloud_gateway_provider) — no manual account-linking step needed. Only set
+# it explicitly (see variables.tf) if your org has more than one provider
+# account for the same cloud provider and you need to disambiguate.
