@@ -38,6 +38,11 @@ resource "konnect_cloud_gateway_configuration" "data_plane" {
   kind              = "dedicated.v0"
   version           = var.cloud_gateway_kong_version
 
+  # Private DCGW: data planes get private IPs only, no public listener.
+  # All inbound traffic must arrive via your own edge (peered VPC/VNet,
+  # Transit Gateway, or AWS resource endpoints).
+  api_access = "private"
+
   dataplane_groups = [
     {
       provider                 = var.cloud_gateway_provider
