@@ -1,0 +1,32 @@
+_format_version: "3.0"
+
+# ---------------------------------------------------------------------------
+# Sample decK state file for testing the Konnect Cloud Gateway control plane
+# with the public Kong httpbin test service (httpbin.konghq.com).
+#
+# Every object below carries the "sample-httpbin" tag. This tag is what lets
+# decK sync/diff this file in isolation with --select-tag, so it never
+# touches any other Service/Route/Plugin already configured on the control
+# plane. See docs/testing-with-deck-httpbin.md for the full walkthrough.
+# ---------------------------------------------------------------------------
+
+services:
+  - name: httpbin-sample-service
+    url: https://httpbin.konghq.com
+    tags:
+      - sample-httpbin
+    routes:
+      - name: httpbin-sample-route
+        paths:
+          - /httpbin-sample
+        strip_path: true
+        tags:
+          - sample-httpbin
+    plugins:
+      - name: request-transformer
+        tags:
+          - sample-httpbin
+        config:
+          add:
+            headers:
+              - "x-deck-sample:httpbin"
