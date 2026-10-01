@@ -2,15 +2,17 @@
 
 This walkthrough loads a small, self-contained decK state file against a
 Konnect **Dedicated Cloud Gateway** control plane to demonstrate the
-`opentelemetry` plugin shipping **traces, access logs, and metrics** from
-Kong directly to **Datadog's SaaS OTLP intake endpoints** — no Datadog Agent
-or OpenTelemetry Collector required for traces/logs.
+`opentelemetry` plugin configured as a **global plugin** — applied to every
+Service/Route on the control plane, with no per-service wiring needed —
+shipping **traces, access logs, and metrics** from Kong directly to
+**Datadog's SaaS OTLP intake endpoints**. No Datadog Agent or OpenTelemetry
+Collector is required for traces/logs.
 
 Files in this folder:
 
 | File | Purpose |
 |---|---|
-| `opentelemetry-datadog-sample.yaml` | The sample decK state: one Service, one Route, one `opentelemetry` Plugin, all tagged `sample-otel-datadog` |
+| `opentelemetry-datadog-sample.yaml` | The sample decK state: a single global `opentelemetry` Plugin, tagged `sample-otel-datadog` |
 | `README-opentelemetry-datadog.md` | This document |
 
 ---
@@ -29,6 +31,13 @@ Every object in `opentelemetry-datadog-sample.yaml` is tagged
 Never run a bare `deck gateway sync opentelemetry-datadog-sample.yaml`
 (without `--select-tag`) against a control plane that has real/other
 configuration on it.
+
+**Also note:** because the plugin in this file is **global** (no
+`service`/`route`/`consumer` attachment), as soon as you sync it, it starts
+exporting telemetry for **every** Service/Route already configured on the
+target control plane — not just a demo Service/Route. Keep that in mind
+before syncing against a shared/live control plane, even with `--select-tag`
+scoping the plugin object itself.
 
 ---
 
@@ -61,6 +70,9 @@ References:
 - A Konnect Personal Access Token (PAT) with permission to manage the target
   control plane — the same `KONNECT_TOKEN` used elsewhere in this repo
 - The name of the Konnect control plane to target
+- At least one Service/Route already configured on the control plane (or one
+  of your own) to generate traffic against, since this sample does not
+  create one — the plugin is global and applies regardless
 - A Datadog account with:
   - Your [Datadog site](https://docs.datadoghq.com/getting_started/site/)
     (e.g. US1 = `datadoghq.com`, EU = `datadoghq.eu`, US3, US5, AP1, or
@@ -140,10 +152,9 @@ deck gateway diff opentelemetry-datadog-sample.rendered.yaml \
   --select-tag sample-otel-datadog
 ```
 
-Expect one Service (`otel-datadog-sample-service`), one Route
-(`otel-datadog-sample-route`), and one Plugin (`opentelemetry`) listed as
-being created. If the diff shows unrelated resources being deleted, **stop**
-— `--select-tag` wasn't applied correctly.
+Expect a single global Plugin (`opentelemetry`) listed as being created. If
+the diff shows unrelated resources being deleted, **stop** — `--select-tag`
+wasn't applied correctly.
 
 ---
 
@@ -162,10 +173,11 @@ deck gateway sync opentelemetry-datadog-sample.rendered.yaml \
 ## Step 5 — Generate traffic and verify in Datadog
 
 Send a few requests through the Dedicated Cloud Gateway's data plane proxy
-endpoint:
+endpoint, against any existing Service/Route on the control plane (the
+plugin is global, so no dedicated demo route is required):
 
 ```bash
-curl -i https://<data-plane-proxy-host>/otel-datadog-sample/get
+curl -i https://<data-plane-proxy-host>/<any-existing-route-path>
 ```
 
 Then check Datadog:
@@ -202,8 +214,8 @@ deck gateway sync empty.yaml \
 ```
 
 Because the sync is scoped with `--select-tag sample-otel-datadog`, only the
-tagged sample Service/Route/Plugin are deleted — everything else on the
-control plane is left untouched.
+tagged sample Plugin is deleted — everything else on the control plane is
+left untouched, and telemetry export stops immediately for all traffic.
 
 ---
 

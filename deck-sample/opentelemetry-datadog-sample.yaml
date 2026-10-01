@@ -1,14 +1,20 @@
 _format_version: "3.0"
 
 # ---------------------------------------------------------------------------
-# Sample decK state file demonstrating the OpenTelemetry plugin on a Konnect
+# Sample decK state file demonstrating the OpenTelemetry plugin, configured
+# as a GLOBAL plugin (no service/route/consumer attachment) on a Konnect
 # Dedicated Cloud Gateway control plane, shipping traces, access logs, and
-# metrics to Datadog's SaaS OTLP intake endpoints.
+# metrics to Datadog's SaaS OTLP intake endpoints for every request that
+# passes through the data plane.
 #
-# Every object below carries the "sample-otel-datadog" tag, so decK can
+# The plugin below carries the "sample-otel-datadog" tag, so decK can
 # sync/diff this file in isolation with --select-tag without touching any
 # other configuration already on the control plane. See README.md for the
 # full walkthrough, including the Datadog-specific caveats called out below.
+#
+# NOTE: because this is a global plugin, it applies to ALL traffic on the
+# control plane the moment it's synced — not just a demo Service/Route. Keep
+# that in mind before syncing against a shared/live control plane.
 #
 # IMPORTANT — read before syncing:
 #   1. Replace ${DATADOG_SITE} below with your Datadog site's OTLP hostname,
@@ -34,44 +40,32 @@ _format_version: "3.0"
 #      do not have this limitation and can go directly to Datadog as shown.
 # ---------------------------------------------------------------------------
 
-services:
-  - name: otel-datadog-sample-service
-    url: https://httpbin.konghq.com
+plugins:
+  - name: opentelemetry
     tags:
       - sample-otel-datadog
-    routes:
-      - name: otel-datadog-sample-route
-        paths:
-          - /otel-datadog-sample
-        strip_path: true
-        tags:
-          - sample-otel-datadog
-    plugins:
-      - name: opentelemetry
-        tags:
-          - sample-otel-datadog
-        config:
-          # Traces: sent directly to Datadog's OTLP traces intake endpoint.
-          traces_endpoint: https://${DATADOG_SITE}/v1/traces
+    config:
+      # Traces: sent directly to Datadog's OTLP traces intake endpoint.
+      traces_endpoint: https://${DATADOG_SITE}/v1/traces
 
-          # Access logs: sent directly to Datadog's OTLP logs intake endpoint.
-          logs_endpoint: https://${DATADOG_SITE}/v1/logs
-          access_logs:
-            endpoint: https://${DATADOG_SITE}/v1/logs
+      # Access logs: sent directly to Datadog's OTLP logs intake endpoint.
+      logs_endpoint: https://${DATADOG_SITE}/v1/logs
+      access_logs:
+        endpoint: https://${DATADOG_SITE}/v1/logs
 
-          # Metrics: see the METRICS CAVEAT note above before relying on this
-          # in a live demo — direct-to-Datadog will reject cumulative metrics.
-          metrics:
-            endpoint: https://${DATADOG_SITE}/v1/metrics
-            push_interval: 10
+      # Metrics: see the METRICS CAVEAT note above before relying on this
+      # in a live demo — direct-to-Datadog will reject cumulative metrics.
+      metrics:
+        endpoint: https://${DATADOG_SITE}/v1/metrics
+        push_interval: 10
 
-          # Datadog authenticates OTLP intake requests via this header on
-          # every exported signal (traces, logs, metrics).
-          headers:
-            dd-api-key: ${DATADOG_API_KEY}
+      # Datadog authenticates OTLP intake requests via this header on
+      # every exported signal (traces, logs, metrics).
+      headers:
+        dd-api-key: ${DATADOG_API_KEY}
 
-          # Identify this Dedicated Cloud Gateway data plane in Datadog APM /
-          # Logs / Infrastructure views. Adjust to taste for your demo.
-          resource_attributes:
-            service.name: dedicated-cloud-gateway-demo
-            deployment.environment: demo
+      # Identify this Dedicated Cloud Gateway data plane in Datadog APM /
+      # Logs / Infrastructure views. Adjust to taste for your demo.
+      resource_attributes:
+        service.name: dedicated-cloud-gateway-demo
+        deployment.environment: demo
