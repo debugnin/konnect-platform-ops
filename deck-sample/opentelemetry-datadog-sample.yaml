@@ -1,0 +1,77 @@
+_format_version: "3.0"
+
+# ---------------------------------------------------------------------------
+# Sample decK state file demonstrating the OpenTelemetry plugin on a Konnect
+# Dedicated Cloud Gateway control plane, shipping traces, access logs, and
+# metrics to Datadog's SaaS OTLP intake endpoints.
+#
+# Every object below carries the "sample-otel-datadog" tag, so decK can
+# sync/diff this file in isolation with --select-tag without touching any
+# other configuration already on the control plane. See README.md for the
+# full walkthrough, including the Datadog-specific caveats called out below.
+#
+# IMPORTANT — read before syncing:
+#   1. Replace ${DATADOG_SITE} below with your Datadog site's OTLP hostname,
+#      e.g. otlp.datadoghq.com (US1), otlp.datadoghq.eu (EU), otlp.us3.datadoghq.com,
+#      otlp.us5.datadoghq.com, otlp.ap1.datadoghq.com, or otlp.ddog-gov.com.
+#      See https://docs.datadoghq.com/getting_started/site/ to find your site,
+#      then confirm the OTLP hostname on the signal-specific intake pages:
+#        https://docs.datadoghq.com/opentelemetry/setup/otlp_ingest/traces/
+#        https://docs.datadoghq.com/opentelemetry/setup/otlp_ingest/logs/
+#        https://docs.datadoghq.com/opentelemetry/setup/otlp_ingest/metrics/
+#   2. Replace ${DATADOG_API_KEY} with a real Datadog API key. Do not commit a
+#      real key to source control — use a decK/Konnect vault reference or an
+#      environment-variable substitution when templating this file for real
+#      use. See https://developer.konghq.com/gateway/entities/vault/
+#   3. METRICS CAVEAT: Datadog's direct OTLP metrics intake endpoint only
+#      accepts *delta* temporality metrics. The Kong OpenTelemetry plugin
+#      currently exports metrics with *cumulative* temporality, so metrics
+#      sent straight to the endpoint below will be rejected by Datadog. The
+#      `metrics` block is included here for completeness / demonstration of
+#      the plugin's syntax, but for a working metrics pipeline you need an
+#      OpenTelemetry Collector (with a `cumulativetodelta` processor) or the
+#      Datadog Agent OTLP intake in between Kong and Datadog. Traces and logs
+#      do not have this limitation and can go directly to Datadog as shown.
+# ---------------------------------------------------------------------------
+
+services:
+  - name: otel-datadog-sample-service
+    url: https://httpbin.konghq.com
+    tags:
+      - sample-otel-datadog
+    routes:
+      - name: otel-datadog-sample-route
+        paths:
+          - /otel-datadog-sample
+        strip_path: true
+        tags:
+          - sample-otel-datadog
+    plugins:
+      - name: opentelemetry
+        tags:
+          - sample-otel-datadog
+        config:
+          # Traces: sent directly to Datadog's OTLP traces intake endpoint.
+          traces_endpoint: https://${DATADOG_SITE}/v1/traces
+
+          # Access logs: sent directly to Datadog's OTLP logs intake endpoint.
+          logs_endpoint: https://${DATADOG_SITE}/v1/logs
+          access_logs:
+            endpoint: https://${DATADOG_SITE}/v1/logs
+
+          # Metrics: see the METRICS CAVEAT note above before relying on this
+          # in a live demo — direct-to-Datadog will reject cumulative metrics.
+          metrics:
+            endpoint: https://${DATADOG_SITE}/v1/metrics
+            push_interval: 10
+
+          # Datadog authenticates OTLP intake requests via this header on
+          # every exported signal (traces, logs, metrics).
+          headers:
+            dd-api-key: ${DATADOG_API_KEY}
+
+          # Identify this Dedicated Cloud Gateway data plane in Datadog APM /
+          # Logs / Infrastructure views. Adjust to taste for your demo.
+          resource_attributes:
+            service.name: dedicated-cloud-gateway-demo
+            deployment.environment: demo
