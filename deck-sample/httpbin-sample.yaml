@@ -30,3 +30,29 @@ services:
           add:
             headers:
               - "x-deck-sample:httpbin"
+      - name: response-transformer-advanced
+        tags:
+          - sample-httpbin
+        config:
+          transform:
+            functions:
+              - |
+                -- Reshapes a JSON:API-style error body:
+                --   { "jsonapi": {...}, "errors": [{ "status": 404, "detail": "...", ... }] }
+                -- into:
+                --   { "errorCode": 404, "errorDetail": "...", "correlationId": "..." }
+                return function (data)
+                  if type(data) ~= "table" or type(data.errors) ~= "table" then
+                    return data
+                  end
+
+                  local err = data.errors[1] or {}
+                  local correlation_id = kong.request.get_header("X-Correlation-Id")
+                                       or kong.request.get_id()
+
+                  return {
+                    errorCode = err.status,
+                    errorDetail = err.detail,
+                    correlationId = correlation_id,
+                  }
+                end
