@@ -1,0 +1,47 @@
+version: "3.8"
+
+# Local Kong Gateway Data Plane joining the Konnect "Sample Control Plane"
+# in hybrid mode over mTLS (pinned client certificate).
+#
+# Prereqs:
+#   - cluster.crt / cluster.key generated and pinned to the control plane via:
+#       POST /v2/control-planes/{controlPlaneId}/dp-client-certificates
+#   - KONG_LICENSE_DATA exported in the shell (enterprise plugins: jq, datakit,
+#     response-transformer-advanced).
+#
+# Once this DP is "Connected" in Konnect, apply the services/routes/plugins
+# from ../local-dataplane/kong.yaml to the Sample Control Plane (e.g. via deck)
+# and traffic will flow through this local proxy at :8000 / :8443.
+
+services:
+  kong-dp:
+    image: kong/kong-gateway:3.15
+    container_name: kong-hybrid-dp
+    restart: unless-stopped
+    environment:
+      KONG_ROLE: data_plane
+      KONG_DATABASE: "off"
+      KONG_VITALS: "off"
+      KONG_KONNECT_MODE: "on"
+      KONG_CLUSTER_MTLS: pki
+      KONG_CLUSTER_CONTROL_PLANE: "78e73f1135.au.cp.konghq.com:443"
+      KONG_CLUSTER_SERVER_NAME: "78e73f1135.au.cp.konghq.com"
+      KONG_CLUSTER_TELEMETRY_ENDPOINT: "78e73f1135.au.tp.konghq.com:443"
+      KONG_CLUSTER_TELEMETRY_SERVER_NAME: "78e73f1135.au.tp.konghq.com"
+      KONG_CLUSTER_CERT: /etc/kong/certs/cluster.crt
+      KONG_CLUSTER_CERT_KEY: /etc/kong/certs/cluster.key
+      KONG_LUA_SSL_TRUSTED_CERTIFICATE: system
+      KONG_PROXY_LISTEN: "0.0.0.0:8000, 0.0.0.0:8443 ssl"
+      KONG_ADMIN_LISTEN: "off"
+      KONG_LICENSE_DATA: "${KONG_LICENSE_DATA}"
+    volumes:
+      - ./cluster.crt:/etc/kong/certs/cluster.crt:ro
+      - ./cluster.key:/etc/kong/certs/cluster.key:ro
+    ports:
+      - "8000:8000"
+      - "8443:8443"
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

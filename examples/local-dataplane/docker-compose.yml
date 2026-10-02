@@ -1,0 +1,29 @@
+services:
+  kong:
+    image: kong/kong-gateway:3.15
+    container_name: kong-examples-dataplane
+    restart: unless-stopped
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yaml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      # jq, datakit, and response-transformer-advanced are all Enterprise
+      # plugins and require a valid license. Export KONG_LICENSE_DATA in
+      # your shell before running `docker compose up` (same env var used
+      # elsewhere in this repo).
+      KONG_LICENSE_DATA: ${KONG_LICENSE_DATA}
+    volumes:
+      - ./kong.yaml:/kong/declarative/kong.yaml:ro
+    ports:
+      - "8000:8000"   # proxy (HTTP)
+      - "8443:8443"   # proxy (HTTPS)
+      - "8001:8001"   # Admin API (HTTP) - localhost only in prod; fine for this local demo
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

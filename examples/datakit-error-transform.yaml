@@ -35,6 +35,37 @@ _format_version: "3.0"
 #     decoding of `service_response.body` only kicks in when the upstream's
 #     Content-Type matches a JSON mime type. If the upstream serves
 #     "application/vnd.api+json" test this end-to-end before relying on it.
+#
+# IMPORTANT GOTCHA (found via local testing against httpbin.konghq.com):
+#   Unlike the `jq` plugin and `response-transformer-advanced`, Datakit's
+#   implicit `service_response.body` input THROWS A HARD 500 (instead of
+#   failing open) when the upstream returns a non-JSON Content-Type (e.g.
+#   `text/html; charset=utf-8` on a plain 404). The error in the logs is:
+#     node service_response failed with error: "failed reading service
+#     response body: unsupported content type 'text/html; charset=utf-8'"
+#   IMPORTANT: a `branch` node does NOT fix this. Branching only controls
+#   which named nodes get *scheduled*; it doesn't remove the underlying data
+#   dependency. Confirmed via live testing: even with RESHAPE_ERROR gated
+#   behind a Content-Type check in a `branch`'s `then:` list, Datakit still
+#   eagerly calls kong.service.response.get_body() for the whole request
+#   because RESHAPE_ERROR's `inputs.body: service_response.body` wiring
+#   exists in the graph -- and that eager read still throws on a non-JSON
+#   Content-Type, regardless of whether RESHAPE_ERROR ends up running.
+#   service_response.headers and service_response.status are safe to read
+#   (they don't trigger the body decode), so you can detect the condition,
+#   but you can't avoid the crash this way once a body-dependent node is
+#   anywhere in the plugin's node graph.
+#
+#   Practical mitigations if you hit this with a real upstream:
+#     1. Only attach this Datakit config to routes/services where the
+#        upstream is contractually guaranteed to return JSON (or empty body
+#        with a JSON content-type) on every status code, including errors.
+#     2. If the upstream can return non-JSON error pages (common for 5xx from
+#        misconfigured proxies, maintenance pages, etc.), use the `jq`
+#        plugin or `response-transformer-advanced` instead -- both fail open
+#        on non-JSON content types rather than throwing a 500.
+#     3. File a support ticket / check the Datakit changelog for a fix; this
+#        may be addressed in a later Datakit/Kong Gateway version.
 # ---------------------------------------------------------------------------
 
 services:
@@ -55,6 +86,12 @@ services:
           - example-datakit
         config:
           nodes:
+            # NOTE: do NOT try to "fix" the gotcha above with a `branch` node
+            # gating this RESHAPE_ERROR node on a Content-Type check -- it
+            # doesn't work (see comment block above). This plugin config is
+            # only safe to use as-is when the upstream is guaranteed to
+            # return JSON (or a JSON-labelled empty body) on every response,
+            # including error responses.
             - name: RESHAPE_ERROR
               type: jq
               inputs:

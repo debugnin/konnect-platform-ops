@@ -76,3 +76,46 @@ deck gateway diff <file>.yaml \
   --konnect-control-plane-name "<your control plane>" \
   --select-tag <example-tag-from-the-file>
 ```
+
+Two verification setups are included in this directory:
+
+- [`local-dataplane/`](./local-dataplane) — a DB-less Kong Gateway in Docker,
+  config applied straight from a mounted `kong.yaml` file. Fastest way to
+  smoke-test routing/plugin wiring with no Konnect dependency.
+- [`hybrid-dataplane/`](./hybrid-dataplane) — a Kong Gateway Docker container
+  joined to a real Konnect Control Plane in **hybrid mode** (mTLS, pinned
+  client certificate), with the same 3 services/routes/plugins pushed via
+  `deck gateway sync`. Use this when you want to validate against an actual
+  Konnect-managed control plane instead of a static local file.
+
+## ⚠️ Datakit finding: hard 500 on non-JSON upstream responses
+
+While verifying these against both local setups, **Datakit's implicit
+`service_response.body` dependency throws a hard 500** (instead of failing
+open, like `jq` and `response-transformer-advanced` do) whenever the
+upstream returns a non-JSON `Content-Type` — e.g. `httpbin.konghq.com`'s
+plain-text/empty 404 response (`text/html; charset=utf-8`). The error:
+
+```
+node service_response failed with error: "failed reading service response
+body: unsupported content type 'text/html; charset=utf-8'"
+```
+
+**Confirmed this is NOT fixable with a `branch` node guard.** A `branch`
+node only controls which named nodes get *scheduled*; it doesn't remove the
+underlying data dependency. Even with the body-reading node gated behind a
+`Content-Type` check in a `branch`'s `then:` list, Datakit still eagerly
+resolves `service_response.body`/`service_response.raw_body` for the whole
+request as soon as *any* node in the graph declares that dependency — and
+that eager read still throws on a non-JSON Content-Type regardless of
+whether the gated node ends up running. (`service_response.headers` and
+`service_response.status` are safe to read and don't trigger this.)
+
+**Practical takeaway for customer conversations:** if the real upstream can
+ever return a non-JSON body on an error path (crashed app, maintenance
+page, misconfigured proxy, plain-text 502/503, etc.), Datakit will 500
+instead of passing the response through — this is a materially different
+failure mode than `jq` or `response-transformer-advanced`, and worth calling
+out explicitly if Datakit is the chosen approach. See the comment block at
+the top of [`datakit-error-transform.yaml`](./datakit-error-transform.yaml)
+for full details and mitigation options.
