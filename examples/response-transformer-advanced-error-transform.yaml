@@ -1,0 +1,85 @@
+_format_version: "3.0"
+
+# ---------------------------------------------------------------------------
+# Example: reshape a JSON:API-style error response AND merge in a
+# correlation ID from a request header, using response-transformer-advanced
+# with a Lua transform function.
+#
+# This is the ONLY one of the three examples in this directory that requires
+# Lua. It's included for comparison against the no-Lua jq and Datakit
+# examples (jq-error-transform.yaml, datakit-error-transform.yaml).
+#
+# response-transformer-advanced's DECLARATIVE options (add/rename/replace/
+# remove/append under config.transform) cannot do this transform on their
+# own: they can't restructure a nested array into new top-level fields, and
+# they have no way to read a request header's value into the response body.
+# A Lua function is required to combine both in one plugin.
+#
+# Upstream response (e.g. a 404 from the backend service):
+#   {
+#     "jsonapi": { "version": "1.0" },
+#     "errors": [
+#       { "status": 404, "title": "some content", "detail": "some content", "id": "some id" }
+#     ]
+#   }
+#
+# Client request header:
+#   X-Correlation-Id: abc-123
+#
+# Transformed response returned to the client:
+#   {
+#     "errorCode": 404,
+#     "errorDetail": "some content",
+#     "correlationId": "abc-123"
+#   }
+#
+# NOTES:
+#   - The Lua function runs in Kong's "strict" Lua sandbox by default
+#     (untrusted_lua=strict), which allows access to kong.request.get_header,
+#     kong.request.get_id, etc. — see
+#     https://developer.konghq.com/gateway/sandboxing/ for the full allowlist.
+#   - Like the jq/Datakit examples, this only fires when the response body
+#     is detected as JSON. Confirm the real upstream's Content-Type header
+#     (e.g. "application/vnd.api+json" vs "application/json") before relying
+#     on this in a live demo.
+# ---------------------------------------------------------------------------
+
+services:
+  - name: response-transformer-advanced-example-service
+    url: https://httpbin.konghq.com
+    tags:
+      - example-response-transformer-advanced
+    routes:
+      - name: response-transformer-advanced-example-route
+        paths:
+          - /response-transformer-advanced-error-transform-example
+        strip_path: true
+        tags:
+          - example-response-transformer-advanced
+    plugins:
+      - name: response-transformer-advanced
+        tags:
+          - example-response-transformer-advanced
+        config:
+          transform:
+            functions:
+              - |
+                -- Reshapes a JSON:API-style error body:
+                --   { "jsonapi": {...}, "errors": [{ "status": 404, "detail": "...", ... }] }
+                -- into:
+                --   { "errorCode": 404, "errorDetail": "...", "correlationId": "..." }
+                return function (data)
+                  if type(data) ~= "table" or type(data.errors) ~= "table" then
+                    return data
+                  end
+
+                  local err = data.errors[1] or {}
+                  local correlation_id = kong.request.get_header("X-Correlation-Id")
+                                       or kong.request.get_id()
+
+                  return {
+                    errorCode = err.status,
+                    errorDetail = err.detail,
+                    correlationId = correlation_id,
+                  }
+                end

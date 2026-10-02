@@ -1,0 +1,63 @@
+_format_version: "3.0"
+
+# ---------------------------------------------------------------------------
+# Example: reshape a JSON:API-style error response using the `jq` plugin
+# (no Lua).
+#
+# Upstream response (e.g. a 404 from the backend service):
+#   {
+#     "jsonapi": { "version": "1.0" },
+#     "errors": [
+#       { "status": 404, "title": "some content", "detail": "some content", "id": "some id" }
+#     ]
+#   }
+#
+# Transformed response returned to the client:
+#   {
+#     "errorCode": 404,
+#     "errorDetail": "some content"
+#   }
+#
+# LIMITATION: the jq plugin only has access to the response BODY. It cannot
+# read request/response headers, so it cannot populate a `correlationId`
+# pulled from a header. If you need the header value merged into the same
+# JSON object, use the Datakit example instead
+# (../examples/datakit-error-transform.yaml).
+#
+# NOTES ON CONFIG:
+#   - response_if_status_code defaults to [200]. You must explicitly list
+#     every status code you want the jq filter to run against (404 here).
+#   - response_if_media_type defaults to ["application/json"]. If your
+#     upstream returns JSON:API-flavored responses with
+#     "Content-Type: application/vnd.api+json", add that media type here too,
+#     otherwise the filter will silently not run.
+# ---------------------------------------------------------------------------
+
+services:
+  - name: jq-example-service
+    url: https://httpbin.konghq.com
+    tags:
+      - example-jq
+    routes:
+      - name: jq-example-route
+        paths:
+          - /jq-error-transform-example
+        strip_path: true
+        tags:
+          - example-jq
+    plugins:
+      - name: jq
+        tags:
+          - example-jq
+        config:
+          response_if_media_type:
+            - application/json
+            - application/vnd.api+json
+          response_if_status_code:
+            - 404
+          response_jq_program: |
+            (.errors[0] // {}) as $err
+            | {
+                errorCode: $err.status,
+                errorDetail: $err.detail
+              }

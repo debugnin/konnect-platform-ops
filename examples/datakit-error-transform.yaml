@@ -1,0 +1,75 @@
+_format_version: "3.0"
+
+# ---------------------------------------------------------------------------
+# Example: reshape a JSON:API-style error response AND merge in a
+# correlation ID from a request header, using the Datakit plugin (no Lua).
+#
+# Datakit is the only no-Lua option here that can combine the response BODY
+# with a REQUEST HEADER in a single declarative jq filter, via its implicit
+# `service_response` and `request` nodes.
+#
+# Upstream response (e.g. a 404 from the backend service):
+#   {
+#     "jsonapi": { "version": "1.0" },
+#     "errors": [
+#       { "status": 404, "title": "some content", "detail": "some content", "id": "some id" }
+#     ]
+#   }
+#
+# Client request header:
+#   X-Correlation-Id: abc-123
+#
+# Transformed response returned to the client:
+#   {
+#     "errorCode": 404,
+#     "errorDetail": "some content",
+#     "correlationId": "abc-123"
+#   }
+#
+# Non-JSON:API-shaped responses (no `errors` array) pass through unchanged.
+#
+# REQUIREMENTS:
+#   - Kong Gateway Enterprise 3.11+ (Datakit plugin availability).
+#   - Confirm your Datadog/customer upstream's actual Content-Type header.
+#     Like jq/response-transformer-advanced, Datakit's automatic JSON
+#     decoding of `service_response.body` only kicks in when the upstream's
+#     Content-Type matches a JSON mime type. If the upstream serves
+#     "application/vnd.api+json" test this end-to-end before relying on it.
+# ---------------------------------------------------------------------------
+
+services:
+  - name: datakit-example-service
+    url: https://httpbin.konghq.com
+    tags:
+      - example-datakit
+    routes:
+      - name: datakit-example-route
+        paths:
+          - /datakit-error-transform-example
+        strip_path: true
+        tags:
+          - example-datakit
+    plugins:
+      - name: datakit
+        tags:
+          - example-datakit
+        config:
+          nodes:
+            - name: RESHAPE_ERROR
+              type: jq
+              inputs:
+                body: service_response.body     # upstream response body
+                headers: request.headers        # client request headers
+              output: response.body             # overwrites the body sent to the client
+              jq: |
+                if (.body.errors != null) then
+                  (.headers | with_entries(.key |= ascii_downcase)) as $h
+                  | (.body.errors[0] // {}) as $err
+                  | {
+                      errorCode: $err.status,
+                      errorDetail: $err.detail,
+                      correlationId: ($h["x-correlation-id"] // null)
+                    }
+                else
+                  .body
+                end
