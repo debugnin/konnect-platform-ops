@@ -55,6 +55,19 @@ resource "konnect_cloud_gateway_configuration" "data_plane" {
           base_rps = var.cloud_gateway_base_rps
         }
       }
+
+      # Enable full tracing instrumentation and 100% sampling on the
+      # dedicated data plane. Env vars must be prefixed with KONG_ or OTEL_.
+      environment = [
+        {
+          name  = "KONG_TRACING_INSTRUMENTATIONS"
+          value = "all"
+        },
+        {
+          name  = "KONG_TRACING_SAMPLING_RATE"
+          value = "1.0"
+        },
+      ]
     },
   ]
 }
